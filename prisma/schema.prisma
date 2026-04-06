@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum Tipo_Usuario {
+  ADMIN
+  USER
+}
+
+enum Status_Agendamento {
+  CANCELADO
+  PENDENTE
+  CONCLUIDO
+}
+
+enum Dia_Semana {
+  DOMINGO
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+  SABADO
+}
+
+model Usuario {
+  id            String          @id @default(uuid())
+  nome          String          @db.VarChar(60)
+  email         String          @unique @db.VarChar(40)
+  telefone      String          @unique @db.VarChar(11)
+  senha         String          @db.VarChar(60)
+  admin         Boolean         @default(false)
+  tipo          Tipo_Usuario    @default(USER)
+  ativo         Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  agendamento   Agendamento[]
+  barbearia     Barbearia[]
+  @@map("usuarios")
+}
+
+model Barbearia {
+  id            Int         @id @default(autoincrement())
+  nome          String      @db.VarChar(60)
+  endereco      String      @db.VarChar(50)
+  telefone      String      @unique @db.VarChar(15)
+  descricao     String?     @db.VarChar(255)
+  horarioOpen   DateTime
+  horarioClose  DateTime
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+  usuarioId     String
+  barbeiros     Barbeiro[]
+  servicos      Servico[]
+  agendamento   Agendamento[]
+  @@map("barbearias")
+}
+
+model Barbeiro {
+  id            Int         @id @default(autoincrement())
+  nome          String      @db.VarChar(60)
+  foto          String?     @db.VarChar(255)
+  bio           String?     @db.VarChar(255)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  barbearia     Barbearia   @relation(fields: [barbeariaId], references: [id])
+  barbeariaId   Int
+  horarios      Horario_Disponivel[]
+  agendamento   Agendamento[]
+  @@map("barbeiros")
+}
+
+model Horario_Disponivel {
+  id            Int         @id @default(autoincrement())
+  diaSemana     Dia_Semana
+  inicio        DateTime
+  fim           DateTime
+  ativo         Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  barbeiro      Barbeiro    @relation(fields: [barbeiroId], references: [id])
+  barbeiroId    Int
+  @@map("horarios_disponiveis")
+}
+
+model Servico {
+  id          Int       @id @default(autoincrement())
+  nome        String    @db.VarChar(60)
+  descricao   String?   @db.VarChar(255)
+  preco       Decimal   @db.Decimal(10, 2)
+  duracaoMin  Int       @db.Integer
+  ativo       Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  barbearia   Barbearia @relation(fields: [barbeariaId], references: [id])
+  barbeariaId Int
+  agendamento Agendamento[]
+  @@map("servicos")
+}
+
+model Agendamento {
+  id            Int                 @id @default(autoincrement())
+  dataHora      DateTime
+  status        Status_Agendamento  @default(PENDENTE)
+  observacao    String?             @db.VarChar(255)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  usuario       Usuario             @relation(fields: [usuarioId], references: [id])
+  servico       Servico             @relation(fields: [servicoId], references: [id])
+  barbearia     Barbearia           @relation(fields: [barbeariaId], references: [id])
+  barbeiro      Barbeiro            @relation(fields: [barbeiroId], references: [id])
+  usuarioId     String
+  servicoId     Int
+  barbeariaId   Int
+  barbeiroId    Int
+  @@map("agendamentos")
+}
