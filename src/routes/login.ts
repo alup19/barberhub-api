@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken"
-import { prisma } from "../../lib/prisma"
+import { prisma } from "../lib/prisma"
 import { Router } from "express"
 import bcrypt from 'bcrypt'
 

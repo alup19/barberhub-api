@@ -1,19 +1,47 @@
-import { prisma } from "../../lib/prisma"
+import { prisma } from "../lib/prisma"
+import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
-import { verificaToken } from "../../middlewares/auth";
-import { isAdmin } from "../../middlewares/isAdmin";
+import { verificaToken } from "../middlewares/auth";
+import { isAdmin } from "../middlewares/isAdmin";
 
 const router = Router();
+
+const timeStringSchema = z.preprocess((value) => {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      const [hours, minutes, seconds = "0"] = trimmed.split(":");
+      const now = new Date();
+      return new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        Number(hours),
+        Number(minutes),
+        Number(seconds),
+      );
+    }
+    const parsed = new Date(trimmed);
+    return !Number.isNaN(parsed.getTime()) ? parsed : trimmed;
+  }
+  return value;
+}, z.date());
 
 const barbeariaSchema = z.object({
   nome: z.string().min(3, { message: "Nome deve ter pelo mínimo 3 caracteres" }),
   endereco: z.string().min(3, { message: "Endereço deve ter pelo mínimo 3 caracteres" }),
   telefone: z.string().min(10, { message: "Telefone deve tem pelo mínimo 10 caracteres" }),
   descricao: z.string().optional().nullable(),
-  horarioOpen: z.coerce.date(),
-  horarioClose: z.coerce.date(),
+  horarioOpen: timeStringSchema,
+  horarioClose: timeStringSchema,
   usuarioId: z.string(),
+}).refine((data) => data.horarioClose > data.horarioOpen, {
+  message: "Horário de fechamento deve ser após o horário de abertura",
+  path: ["horarioClose"],
 });
 
 const atualizarBarbeariaSchema = z.object({
@@ -21,8 +49,8 @@ const atualizarBarbeariaSchema = z.object({
   endereco: z.string().min(3).optional(),
   telefone: z.string().min(10).optional(),
   descricao: z.string().optional().nullable(),
-  horarioOpen: z.coerce.date().optional(),
-  horarioClose: z.coerce.date().optional(),
+  horarioOpen: timeStringSchema.optional(),
+  horarioClose: timeStringSchema.optional(),
 });
 
 function barbeariaInfosAdicionais(barbearia: any) {
@@ -130,7 +158,16 @@ router.post("/", verificaToken, async (req, res) => {
     res.status(201).json(barbeariaComTotais);
   } catch (error) {
     console.error("Erro ao criar barbearia:", error);
-    res.status(400).json({ erro: "Erro ao criar barbearia" });
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const target = Array.isArray(error.meta?.target)
+        ? error.meta.target.join(", ")
+        : error.meta?.target;
+      return res.status(400).json({ erro: `Registro duplicado para o campo(s): ${target}` });
+    }
+
+    const mensagem = error instanceof Error ? error.message : "Erro ao criar barbearia";
+    res.status(400).json({ erro: mensagem });
   }
 });
 
@@ -150,6 +187,10 @@ router.put("/:id", verificaToken, async (req, res) => {
     horarioOpen,
     horarioClose,
   } = parseResult.data;
+
+  if (horarioOpen && horarioClose && horarioClose <= horarioOpen) {
+    return res.status(400).json({ erro: "Horário de fechamento deve ser após o horário de abertura" });
+  }
 
   try {
     const dadosAtualizacao: any = {};

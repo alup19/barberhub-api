@@ -1,9 +1,9 @@
-import { prisma } from "../../lib/prisma"
+import { prisma } from "../lib/prisma"
 import { Router } from 'express'
 import bcrypt from 'bcrypt'
 import { z } from 'zod'
-import { verificaToken } from "../../middlewares/auth";
-import { isAdmin } from "../../middlewares/isAdmin";
+import { verificaToken } from "../middlewares/auth";
+import { isAdmin } from "../middlewares/isAdmin";
 
 const router = Router()
 
@@ -136,10 +136,9 @@ const promoverSchema = z.object({
   ativar: z.boolean()
 })
 
-router.put(
-  "usuarios/promover-admin", 
+router.patch(
+  "/promover-admin", 
   verificaToken,
-  isAdmin,
   async (req, res) => {
     try {
       const valida = promoverSchema.safeParse(req.body)

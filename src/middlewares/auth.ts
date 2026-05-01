@@ -2,8 +2,10 @@ import jwt  from "jsonwebtoken"
 import { Request, Response, NextFunction } from 'express'
 
 type TokenType = {
-    adminLogadoId: string
-    adminLogadoNome: string
+    usuarioLogadoId: string
+    usuarioLogadoNome: string
+    adminLogadoId?: string  // opcional para compatibilidade
+    adminLogadoNome?: string  // opcional para compatibilidade
 }
 
 // Acrescenta na interface Request (de forma global) os 2 novos atributos (TypeScript)
@@ -29,10 +31,18 @@ export function verificaToken(req: Request | any, res: Response, next: NextFunct
     try {
         const decode = jwt.verify(token, process.env.JWT_KEY as string)
         // console.log(decode)
-        const { adminLogadoId, adminLogadoNome } = decode as TokenType
+        const decoded = decode as TokenType
 
-        req.userLogadoId    = adminLogadoId
-        req.userLogadoNome  = adminLogadoNome
+        // Suporte para tokens antigos (adminLogadoId) e novos (usuarioLogadoId)
+        const userId = decoded.usuarioLogadoId || decoded.adminLogadoId
+        const userNome = decoded.usuarioLogadoNome || decoded.adminLogadoNome
+
+        if (!userId || !userNome) {
+            return res.status(401).json({ error: "Token malformado" })
+        }
+
+        req.userLogadoId    = userId
+        req.userLogadoNome  = userNome
 
         next()
     } catch (error) {

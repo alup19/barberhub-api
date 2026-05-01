@@ -1,7 +1,7 @@
-import { prisma } from "../../lib/prisma";
+import { prisma } from "../lib/prisma";
 import { Router } from "express";
 import { z } from "zod";
-import { verificaToken } from "../../middlewares/auth";
+import { verificaToken } from "../middlewares/auth";
 
 const router = Router();
 

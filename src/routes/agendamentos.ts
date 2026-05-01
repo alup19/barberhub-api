@@ -1,8 +1,9 @@
-import { prisma } from "../../lib/prisma";
-import { Status_Agendamento } from "@prisma/client";
+import { prisma } from "../lib/prisma";
+import { Status_Agendamento, Dia_Semana } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
-import { verificaToken } from "../../middlewares/auth";
+import { verificaToken } from "../middlewares/auth";
+import { isAdmin } from "../middlewares/isAdmin";
 
 const router = Router();
 
@@ -21,6 +22,120 @@ const atualizarAgendamentoSchema = z.object({
   status: z.nativeEnum(Status_Agendamento).optional(),
   observacao: z.string().optional().nullable(),
 });
+
+// Função auxiliar para obter o dia da semana
+function getDiaSemana(date: Date): Dia_Semana {
+  const dias = [
+    Dia_Semana.DOMINGO,
+    Dia_Semana.SEGUNDA,
+    Dia_Semana.TERCA,
+    Dia_Semana.QUARTA,
+    Dia_Semana.QUINTA,
+    Dia_Semana.SEXTA,
+    Dia_Semana.SABADO,
+  ];
+  return dias[date.getDay()];
+}
+
+// Função para validar disponibilidade do agendamento
+async function validarDisponibilidadeAgendamento(
+  dataHora: Date,
+  barbeiroId: number,
+  barbeariaId: number,
+  servicoId: number
+): Promise<{ valido: boolean; erro?: string }> {
+  try {
+    // 1. Verificar se a barbearia existe e está aberta no horário
+    const barbearia = await prisma.barbearia.findUnique({
+      where: { id: barbeariaId },
+    });
+
+    if (!barbearia) {
+      return { valido: false, erro: "Barbearia não encontrada" };
+    }
+
+    // Extrair apenas a hora dos horários da barbearia (ignorando a data)
+    const horaAgendamento = dataHora.getHours() * 60 + dataHora.getMinutes();
+    const horaAbertura = barbearia.horarioOpen.getHours() * 60 + barbearia.horarioOpen.getMinutes();
+    const horaFechamento = barbearia.horarioClose.getHours() * 60 + barbearia.horarioClose.getMinutes();
+
+    if (horaAgendamento < horaAbertura || horaAgendamento >= horaFechamento) {
+      return { valido: false, erro: "Barbearia fechada neste horário" };
+    }
+
+    // 2. Verificar se o barbeiro trabalha no dia da semana
+    const diaSemana = getDiaSemana(dataHora);
+
+    const horariosBarbeiro = await prisma.horario_Disponivel.findMany({
+      where: {
+        barbeiroId,
+        diaSemana,
+        ativo: true,
+      },
+    });
+
+    if (horariosBarbeiro.length === 0) {
+      return { valido: false, erro: "Barbeiro não trabalha neste dia da semana" };
+    }
+
+    // 3. Verificar se o horário está dentro dos horários disponíveis do barbeiro
+    const horarioValido = horariosBarbeiro.some((horario) => {
+      const horaInicio = horario.inicio.getHours() * 60 + horario.inicio.getMinutes();
+      const horaFim = horario.fim.getHours() * 60 + horario.fim.getMinutes();
+      return horaAgendamento >= horaInicio && horaAgendamento < horaFim;
+    });
+
+    if (!horarioValido) {
+      return { valido: false, erro: "Horário fora do expediente do barbeiro" };
+    }
+
+    // 4. Verificar se há conflito com outros agendamentos
+    const servico = await prisma.servico.findUnique({
+      where: { id: servicoId },
+    });
+
+    if (!servico) {
+      return { valido: false, erro: "Serviço não encontrado" };
+    }
+
+    const duracaoMin = servico.duracaoMin;
+    const fimAgendamento = new Date(dataHora.getTime() + duracaoMin * 60000);
+
+    const conflitos = await prisma.agendamento.findMany({
+      where: {
+        barbeiroId,
+        status: { in: ["PENDENTE", "CONCLUIDO"] },
+        OR: [
+          {
+            AND: [
+              { dataHora: { lte: dataHora } },
+              {
+                dataHora: {
+                  gte: new Date(dataHora.getTime() - duracaoMin * 60000),
+                },
+              },
+            ],
+          },
+          {
+            AND: [
+              { dataHora: { gte: dataHora } },
+              { dataHora: { lt: fimAgendamento } },
+            ],
+          },
+        ],
+      },
+    });
+
+    if (conflitos.length > 0) {
+      return { valido: false, erro: "Horário já ocupado por outro agendamento" };
+    }
+
+    return { valido: true };
+  } catch (error) {
+    console.error("Erro ao validar disponibilidade:", error);
+    return { valido: false, erro: "Erro interno ao validar disponibilidade" };
+  }
+}
 
 router.get("/", async (req, res) => {
   try {
@@ -100,6 +215,18 @@ router.post("/", verificaToken, async (req, res) => {
   } = valida.data;
 
   try {
+    // Validar disponibilidade antes de criar o agendamento
+    const validacao = await validarDisponibilidadeAgendamento(
+      dataHora,
+      barbeiroId,
+      barbeariaId,
+      servicoId
+    );
+
+    if (!validacao.valido) {
+      return res.status(400).json({ erro: validacao.erro });
+    }
+
     const agendamento = await prisma.agendamento.create({
       data: {
         dataHora,
@@ -167,7 +294,7 @@ router.put("/:id", verificaToken, async (req, res) => {
   }
 });
 
-router.delete("/:id", verificaToken, async (req, res) => {
+router.delete("/:id", verificaToken, isAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
