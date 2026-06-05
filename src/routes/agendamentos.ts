@@ -70,7 +70,6 @@ async function validarDisponibilidadeAgendamento(
       where: {
         barbeiroId,
         diaSemana,
-        ativo: true,
       },
     });
 

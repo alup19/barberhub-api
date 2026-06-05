@@ -5,12 +5,17 @@ import { verificaToken } from "../middlewares/auth";
 
 const router = Router();
 
-const barbeiroBarbeSchema = z.object({
+const criarBarbeiroSchema = z.object({
   nome: z.string().min(3, { message: "Nome deve ter pelo mínimo 3 caracteres" }),
-  foto: z.string().optional().nullable(),
-  bio: z.string().optional().nullable(),
+  email: z.string().email({ message: "E-mail inválido" }).min(10, { message: "E-mail muito curto" }),
+  telefone: z.string().min(11).max(11, { message: "Telefone deve conter 11 dígitos (somente números)" }),
+  anosExp: z.coerce.number().int().nonnegative({ message: "Anos de experiência deve ser um número inteiro não-negativo" }),
+  ativo: z.boolean().optional().default(true),
+  funcao: z.enum(["BARBEIRO", "APRENDIZ", "GERENTE"]).optional().default("BARBEIRO"),
   barbeariaId: z.coerce.number().int().positive(),
 });
+
+const atualizarBarbeiroSchema = criarBarbeiroSchema.partial();
 
 function barbeiroInfosAdicionais(barbeiro: any) {
   const agendamentosDoBarbbeiro = Array.isArray(barbeiro.agendamento)
@@ -73,20 +78,23 @@ router.get("/barbearia/:barbeariaId", async (req, res) => {
 });
 
 router.post("/", verificaToken, async (req, res) => {
-  const parseResult = barbeiroBarbeSchema.safeParse(req.body);
+  const parseResult = criarBarbeiroSchema.safeParse(req.body);
 
   if (!parseResult.success) {
     return res.status(400).json({ erro: parseResult.error.flatten() });
   }
 
-  const { nome, foto, bio, barbeariaId } = parseResult.data;
+  const { nome, email, telefone, anosExp, ativo, funcao, barbeariaId } = parseResult.data;
 
   try {
     const novoBarbeiro = await prisma.barbeiro.create({
       data: {
         nome,
-        foto: foto ?? null,
-        bio: bio ?? null,
+        email,
+        telefone,
+        anosExp,
+        ativo: ativo ?? true,
+        funcao: funcao ?? "BARBEIRO",
         barbeariaId,
       },
       include: {
@@ -106,23 +114,28 @@ router.post("/", verificaToken, async (req, res) => {
 
 router.put("/:id", verificaToken, async (req, res) => {
   const { id } = req.params;
-  const parseResult = barbeiroBarbeSchema.safeParse(req.body);
+  const parseResult = atualizarBarbeiroSchema.safeParse(req.body);
 
   if (!parseResult.success) {
     return res.status(400).json({ erro: parseResult.error.flatten() });
   }
 
-  const { nome, foto, bio, barbeariaId } = parseResult.data;
+  const { nome, email, telefone, anosExp, ativo, funcao, barbeariaId } = parseResult.data;
 
   try {
+    const dadosAtualizacao: any = {};
+
+    if (typeof nome !== "undefined") dadosAtualizacao.nome = nome;
+    if (typeof email !== "undefined") dadosAtualizacao.email = email;
+    if (typeof telefone !== "undefined") dadosAtualizacao.telefone = telefone;
+    if (typeof anosExp !== "undefined") dadosAtualizacao.anosExp = anosExp;
+    if (typeof ativo !== "undefined") dadosAtualizacao.ativo = ativo;
+    if (typeof funcao !== "undefined") dadosAtualizacao.funcao = funcao;
+    if (typeof barbeariaId !== "undefined") dadosAtualizacao.barbeariaId = barbeariaId;
+
     const barbeiro = await prisma.barbeiro.update({
       where: { id: Number(id) },
-      data: {
-        nome,
-        foto: foto ?? null,
-        bio: bio ?? null,
-        barbeariaId,
-      },
+      data: dadosAtualizacao,
       include: {
         barbearia: true,
         agendamento: true,

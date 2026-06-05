@@ -10,7 +10,6 @@ const horarioSchema = z.object({
   diaSemana: z.nativeEnum(Dia_Semana),
   inicio: z.coerce.date(),
   fim: z.coerce.date(),
-  ativo: z.boolean().optional().default(true),
   barbeiroId: z.coerce.number().int().positive(),
 });
 
@@ -18,7 +17,6 @@ const atualizarHorarioSchema = z.object({
   diaSemana: z.nativeEnum(Dia_Semana).optional(),
   inicio: z.coerce.date().optional(),
   fim: z.coerce.date().optional(),
-  ativo: z.boolean().optional(),
 });
 
 router.get("/", async (req, res) => {
@@ -48,7 +46,6 @@ router.get("/barbeiro/:barbeiroId", async (req, res) => {
     const horarios = await prisma.horario_Disponivel.findMany({
       where: {
         barbeiroId: Number(barbeiroId),
-        ativo: true,
       },
       include: {
         barbeiro: {
@@ -73,7 +70,7 @@ router.post("/", verificaToken, async (req, res) => {
     return res.status(400).json({ erro: valida.error });
   }
 
-  const { diaSemana, inicio, fim, ativo, barbeiroId } = valida.data;
+  const { diaSemana, inicio, fim, barbeiroId } = valida.data;
 
   try {
     const novoHorario = await prisma.horario_Disponivel.create({
@@ -81,7 +78,6 @@ router.post("/", verificaToken, async (req, res) => {
         diaSemana,
         inicio,
         fim,
-        ativo: ativo ?? true,
         barbeiroId,
       },
       include: {
@@ -108,7 +104,7 @@ router.put("/:id", verificaToken, async (req, res) => {
     return res.status(400).json({ erro: valida.error });
   }
 
-  const { diaSemana, inicio, fim, ativo } = valida.data;
+  const { diaSemana, inicio, fim } = valida.data;
 
   try {
     const dadosAtualizacao: any = {};
@@ -123,10 +119,6 @@ router.put("/:id", verificaToken, async (req, res) => {
 
     if (typeof fim !== "undefined") {
       dadosAtualizacao.fim = fim;
-    }
-
-    if (typeof ativo !== "undefined") {
-      dadosAtualizacao.ativo = ativo;
     }
 
     const horario = await prisma.horario_Disponivel.update({

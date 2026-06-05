@@ -6,7 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum Tipo_Usuario {
   ADMIN
   USER
@@ -16,6 +15,21 @@ enum Status_Agendamento {
   CANCELADO
   PENDENTE
   CONCLUIDO
+}
+
+enum Funcao_Barbeiro {
+  BARBEIRO
+  APRENDIZ
+  GERENTE
+}
+
+enum Categoria_Servico {
+  CABELO
+  BARBA
+  SOBRANCELHA
+  TRATAMENTO
+  ESTETICA
+  PREMIUM
 }
 
 enum Dia_Semana {
@@ -65,14 +79,17 @@ model Barbearia {
 model Barbeiro {
   id            Int         @id @default(autoincrement())
   nome          String      @db.VarChar(60)
-  foto          String?     @db.VarChar(255)
-  bio           String?     @db.VarChar(255)
+  telefone      String      @unique @db.VarChar(11)
+  email         String      @unique @db.VarChar(40)
+  anosExp       Int         @db.Integer
+  ativo         Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   barbearia     Barbearia   @relation(fields: [barbeariaId], references: [id])
   barbeariaId   Int
   horarios      Horario_Disponivel[]
   agendamento   Agendamento[]
+  funcao        Funcao_Barbeiro @default(BARBEIRO)
   @@map("barbeiros")
 }
 
@@ -81,7 +98,6 @@ model Horario_Disponivel {
   diaSemana     Dia_Semana
   inicio        DateTime
   fim           DateTime
-  ativo         Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   barbeiro      Barbeiro    @relation(fields: [barbeiroId], references: [id])
@@ -101,6 +117,7 @@ model Servico {
   barbearia   Barbearia @relation(fields: [barbeariaId], references: [id])
   barbeariaId Int
   agendamento Agendamento[]
+  categoria   Categoria_Servico @default(CABELO)
   @@map("servicos")
 }
 

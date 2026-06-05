@@ -12,6 +12,7 @@ const criarServicoSchema = z.object({
   duracaoMin: z.coerce.number().int().positive({ message: "Duração deve ser positiva" }),
   barbeariaId: z.coerce.number().int().positive(),
   ativo: z.boolean().optional().default(true),
+  categoria: z.enum(["CABELO","BARBA","SOBRANCELHA","TRATAMENTO","ESTETICA","PREMIUM"]).optional().default("CABELO"),
 });
 
 const atualizarServicoSchema = z.object({
@@ -20,6 +21,7 @@ const atualizarServicoSchema = z.object({
   preco: z.coerce.number().positive().optional(),
   duracaoMin: z.coerce.number().int().positive().optional(),
   ativo: z.boolean().optional(),
+  categoria: z.enum(["CABELO","BARBA","SOBRANCELHA","TRATAMENTO","ESTETICA","PREMIUM"]).optional(),
 });
 
 function formatarServicoParaExibicao(servico: any) {
@@ -81,6 +83,7 @@ router.post("/", verificaToken, async (req, res) => {
         duracaoMin: dadosValidados.duracaoMin,
         barbeariaId: dadosValidados.barbeariaId,
         ativo: dadosValidados.ativo ?? true,
+        categoria: dadosValidados.categoria ?? "CABELO",
       },
       include: {
         barbearia: true,
@@ -127,6 +130,10 @@ router.put("/:id", verificaToken, async (req, res) => {
 
     if (typeof corpoValido.ativo !== "undefined") {
       dadosAtualizacao.ativo = corpoValido.ativo;
+    }
+
+    if (typeof corpoValido.categoria !== "undefined") {
+      dadosAtualizacao.categoria = corpoValido.categoria;
     }
 
     const servicoAtualizado = await prisma.servico.update({
