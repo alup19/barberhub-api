@@ -26,6 +26,8 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ erro: mensagemPadrao })
     }
 
+    const barbearia = await prisma.barbearia.findFirst({ where: { usuarioId: usuario.id } })
+
     const token = jwt.sign(
       { usuarioLogadoId: usuario.id, usuarioLogadoNome: usuario.nome },
       process.env.JWT_KEY as string,
@@ -36,8 +38,10 @@ router.post("/", async (req, res) => {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
+      telefone: usuario.telefone,
       tipo: usuario.tipo,
       admin: usuario.admin,
+      barbeariaId: barbearia?.id,
       token
     })
   } catch (error) {
