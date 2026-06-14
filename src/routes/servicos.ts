@@ -55,7 +55,6 @@ router.get("/barbearia/:barbeariaId", async (req, res) => {
     const servicos = await prisma.servico.findMany({
       where: {
         barbeariaId: Number(barbeariaId),
-        ativo: true,
       },
       include: {
         barbearia: true,
