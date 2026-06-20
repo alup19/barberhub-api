@@ -185,4 +185,24 @@ router.patch(
   }
 )
 
+router.get("/telefone/:telefone", async (req, res) => {
+  const { telefone } = req.params;
+
+  try {
+    const usuario = await prisma.usuario.findUnique({
+      where: { telefone },
+      select: { id: true, nome: true, telefone: true },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ erro: "Usuário não encontrado" });
+    }
+
+    res.status(200).json(usuario);
+  } catch (error) {
+    console.error("Erro ao buscar usuário por telefone:", error);
+    res.status(500).json({ erro: "Erro ao buscar usuário" });
+  }
+});
+
 export default router
